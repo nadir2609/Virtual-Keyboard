@@ -28,8 +28,6 @@ def main():
             for hand_landmarks in hand_landmarks_list:
                 draw_landmarks(frame, hand_landmarks, frame.shape)
                 landmark_positions = get_landmark_positions(hand_landmarks, frame.shape)
-                fingertip_postitons = get_fingertip_positions(hand_landmarks, frame.shape)
-                print(fingertip_postitons)
         cv.imshow("Virtual Keyboard", frame)
         if cv.waitKey(1) & 0xFF == ord("q"):
             break
