@@ -7,3 +7,18 @@ TRACKING_CONFIDENCE = 0.8
 
 # Gesture detection
 CLICK_THRESHOLD = 40  # pixels - distance for click detection
+
+KEYBOARD_LAYOUT = [
+['Q','W','E','R','T','Y','U','I','O','P'],
+['A','S','D','F','G','H','J','K','L'],
+['Z','X','C','V','B','N','M']
+]
+
+KEY_SIZE = 80
+KEY_MARGIN = 5
+KEYBOARD_START_X = 50
+KEYBOARD_START_Y = 300
+COLOR_KEY_DEFAULT = (50, 50, 50)
+COLOR_KEY_HOVER = (100, 100, 100)
+COLOR_KEY_PRESS = (0, 255, 0)
+COLOR_TEXT = (255, 255, 255)
