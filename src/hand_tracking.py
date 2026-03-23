@@ -76,20 +76,11 @@ def get_landmark_positions(hand_landmarks, frame_shape):
 
 def get_fingertip_positions(hand_landmarks, frame_shape):
     landmark_positions = get_landmark_positions(hand_landmarks, frame_shape)
-    print(landmark_positions)
-    fingertip_positions = {}
-    for i, landmark in enumerate(landmark_positions):
-        if i == 4:
-            fingertip_positions["Thumb"] = landmark
-        if i == 8:
-            fingertip_positions["Index"] = landmark
-        if i == 12:
-            fingertip_positions["Middle"] = landmark
-        if i == 16:
-            fingertip_positions["Ring"] = landmark
-        if i == 20:
-            fingertip_positions["Pinky"] = landmark
-
+    fingertip_positions = {
+        "Thumb": landmark_positions[4],
+        "Index": landmark_positions[8],
+        "Middle": landmark_positions[12],
+        "Ring": landmark_positions[16],
+        "Pinky": landmark_positions[20]
+    }
     return fingertip_positions
-
-

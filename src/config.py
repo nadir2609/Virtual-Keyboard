@@ -4,3 +4,6 @@ WINDOW_HEIGHT = 720
 MAX_HANDS = 1
 DETECTION_CONFIDENCE = 0.8
 TRACKING_CONFIDENCE = 0.8
+
+# Gesture detection
+CLICK_THRESHOLD = 40  # pixels - distance for click detection
