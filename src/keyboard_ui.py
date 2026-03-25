@@ -1,4 +1,5 @@
 import cv2
+from config import COLOR_KEY_DEFAULT, COLOR_KEY_HOVER, COLOR_KEY_PRESS
 
 
 def generate_key_positions(layout):
@@ -53,15 +54,15 @@ def draw_single_key(frame, key_data, color):
     cv2.putText(frame, char, (text_x, text_y), font, font_scale, (255, 255, 255), 2)
 
 
-def draw_keyboard(frame, keys, hover_key=None):
-    normal_color = (100, 100, 100)
-    hover_color = (150, 200, 150)
-
+def draw_keyboard(frame, keys, hover_key=None, pressed_key=None):
     for key in keys:
-        if hover_key and key["char"] == hover_key["char"]:
-            draw_single_key(frame, key, hover_color)
+        # Prioritize pressed key color, then hover color, then default
+        if pressed_key and key["char"] == pressed_key["char"]:
+            draw_single_key(frame, key, COLOR_KEY_PRESS)
+        elif hover_key and key["char"] == hover_key["char"]:
+            draw_single_key(frame, key, COLOR_KEY_HOVER)
         else:
-            draw_single_key(frame, key, normal_color)
+            draw_single_key(frame, key, COLOR_KEY_DEFAULT)
 
 
 def point_in_key(point, key_data):
