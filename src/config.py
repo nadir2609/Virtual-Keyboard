@@ -6,7 +6,6 @@ DETECTION_CONFIDENCE = 0.8
 TRACKING_CONFIDENCE = 0.8
 
 # Gesture detection
-CLICK_THRESHOLD = 40  # pixels - distance for click detection
 
 KEYBOARD_LAYOUT = [
 ['Q','W','E','R','T','Y','U','I','O','P'],
@@ -22,3 +21,6 @@ COLOR_KEY_DEFAULT = (50, 50, 50)
 COLOR_KEY_HOVER = (100, 100, 100)
 COLOR_KEY_PRESS = (0, 255, 0)
 COLOR_TEXT = (255, 255, 255)
+
+CLICK_THRESHOLD = 35 # distance for click detection
+DEBOUNCE_DELAY = 0.3 # seconds between presses
