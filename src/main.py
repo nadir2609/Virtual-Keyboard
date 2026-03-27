@@ -1,114 +1,128 @@
+# main.py
 import cv2 as cv
-from config import CAMERA_ID, WINDOW_WIDTH, WINDOW_HEIGHT, KEYBOARD_LAYOUT, DEBOUNCE_DELAY
-from gesture import is_clicking, get_click_position, get_fingers_up
-from hand_tracking import (
-    init_detector,
-    find_hands,
-    get_landmark_positions,
-    draw_landmarks,
-    get_fingertip_positions,
-)
-from keyboard_ui import generate_key_positions, draw_keyboard, get_hovered_key
-from input_handler import init_keyboard_controller, press_character, press_special_key
 import time
+from config import CAMERA_ID, WINDOW_WIDTH, WINDOW_HEIGHT, CLICK_THRESHOLD, DEBOUNCE_DELAY
+from gesture import is_clicking, get_click_position, get_fingers_up
+from hand_tracking import (init_detector, find_hands, get_landmark_positions,
+                            draw_landmarks, get_fingertip_positions)
+from keyboard_ui import (generate_key_positions, draw_keyboard,
+                          get_hovered_key, draw_text_display)
+from input_handler import init_keyboard_controller, handle_key_press, is_special_key
+
+PRESS_FEEDBACK = 0.15
+SMOOTH = 0.35  # smoothing factor: 0.0 = max smooth, 1.0 = no smooth
+
+def smooth_landmarks(prev, curr, factor):
+    """Blend previous and current landmark positions to reduce jitter."""
+    if prev is None:
+        return curr
+    return [
+        (int(prev[i][0] * (1 - factor) + curr[i][0] * factor),
+         int(prev[i][1] * (1 - factor) + curr[i][1] * factor))
+        for i in range(len(curr))
+    ]
 
 def main():
     cap = cv.VideoCapture(CAMERA_ID)
-    cap.set(cv.CAP_PROP_FRAME_WIDTH, WINDOW_WIDTH)
+    cap.set(cv.CAP_PROP_FRAME_WIDTH,  WINDOW_WIDTH)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, WINDOW_HEIGHT)
 
     detector = init_detector()
-
-    # Generate key positions ONCE at start (not every frame)
-    keys = generate_key_positions(KEYBOARD_LAYOUT)
+    keys     = generate_key_positions()
     keyboard = init_keyboard_controller()
-    last_press_time = 0
-    pressed_key = None
-    pressed_key_time = 0
-    press_feedback_duration = 0.15
+
+    typed_text   = ''
+    caps_on      = False
+    shift_on     = False
+    pressed_key  = None
+    pressed_time = 0.0
+
+    was_pinching  = False
+    can_press     = True
+    prev_lm_pos   = None   # smoothed landmark positions from last frame
+
+    cv.namedWindow("Virtual Keyboard", cv.WINDOW_NORMAL)
+    cv.setWindowProperty("Virtual Keyboard", cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        frame = cv.flip(frame, 1)  # Mirror the frame
-
-        # Track hovered key (None if no hand or not hovering)
+        frame = cv.flip(frame, 1)
         hovered_key = None
 
-        hand_landmarks_list = find_hands(frame, detector)
-        if hand_landmarks_list:
-            for hand_landmarks in hand_landmarks_list:
-                # Draw hand skeleton
-                draw_landmarks(frame, hand_landmarks, frame.shape)
+        landmarks_list = find_hands(frame, detector)
+        if landmarks_list:
+            for lm in landmarks_list:
+                # Raw positions this frame
+                raw_lm_pos = get_landmark_positions(lm, frame.shape)
 
-                # Get positions
-                landmark_positions = get_landmark_positions(hand_landmarks, frame.shape)
-                fingertip_positions = get_fingertip_positions(hand_landmarks, frame.shape)
+                # Smooth all 21 points against previous frame
+                smooth_lm_pos = smooth_landmarks(prev_lm_pos, raw_lm_pos, SMOOTH)
+                prev_lm_pos   = smooth_lm_pos
 
-                # Check which fingers are up
-                fingers_up = get_fingers_up(landmark_positions)
-                finger_names = ["Thumb", "Index", "Middle", "Ring", "Pinky"]
+                # Build smoothed fingertip dict from smoothed positions
+                ft_pos = {
+                    "Thumb":  smooth_lm_pos[4],
+                    "Index":  smooth_lm_pos[8],
+                    "Middle": smooth_lm_pos[12],
+                    "Ring":   smooth_lm_pos[16],
+                    "Pinky":  smooth_lm_pos[20],
+                }
 
-                # Display fingers status
-                fingers_text = "Fingers: "
-                for i, (name, is_up) in enumerate(zip(finger_names, fingers_up)):
-                    if is_up:
-                        fingers_text += f"{name} "
-                cv.putText(frame, fingers_text, (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                # Draw skeleton using smoothed points
+                draw_landmarks(frame, smooth_lm_pos, frame.shape)
 
-                # Get index finger position for hover detection
-                index_pos = fingertip_positions["Index"]
-
-                # Check if index finger is hovering over any key
+                index_pos   = ft_pos['Index']
                 hovered_key = get_hovered_key(index_pos, keys)
 
-                # Display hovered key
-                if hovered_key:
-                    cv.putText(frame, f"Hover: {hovered_key['char']}", (10, 60),
-                               cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                pinching = is_clicking(ft_pos, threshold=CLICK_THRESHOLD)
 
-                # Check for click gesture AND hovering over a key
-                if is_clicking(fingertip_positions) and hovered_key:
-                    current_time = time.time()
+                if was_pinching and not pinching:
+                    can_press = True
 
-                    # Debounce check - only press if enough time has passed
-                    if current_time - last_press_time > DEBOUNCE_DELAY:
-                        # Press the key
-                        press_character(keyboard, hovered_key["char"].lower())
+                if pinching and can_press and hovered_key:
+                    typed_text, caps_on, shift_on = handle_key_press(
+                        keyboard, hovered_key['char'],
+                        typed_text, caps_on, shift_on)
+                    pressed_key  = hovered_key
+                    pressed_time = time.time()
+                    can_press    = False
 
-                        # Update tracking variables
-                        last_press_time = current_time
-                        pressed_key = hovered_key
-                        pressed_key_time = current_time
+                    cp = get_click_position(ft_pos)
+                    if cp:
+                        cv.circle(frame, cp, 12, (0,255,0), -1)
+                        cv.circle(frame, cp, 12, (255,255,255), 2)
 
-                        # Visual feedback
-                        click_pos = get_click_position(fingertip_positions)
-                        if click_pos:
-                            cv.circle(frame, click_pos, 15, (0, 255, 0), -1)
+                was_pinching = pinching
 
-                # Draw purple circle on index fingertip
-                cv.circle(frame, index_pos, 10, (255, 0, 255), 2)
+                cv.circle(frame, index_pos, 8, (255,0,255), -1)
+                cv.circle(frame, index_pos, 8, (255,255,255),  2)
 
-        # Display pressed key feedback
-        if pressed_key:
-            cv.putText(frame, f"Pressed: {pressed_key['char']}", (10, 90),
-                       cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        else:
+            # Hand left frame — reset smoothing
+            prev_lm_pos = None
 
-        # Clear pressed_key feedback after duration
-        if pressed_key and time.time() - pressed_key_time > press_feedback_duration:
+        if pressed_key and time.time() - pressed_time > PRESS_FEEDBACK:
             pressed_key = None
 
-        # Draw keyboard EVERY frame (with hover and press highlight)
-        draw_keyboard(frame, keys, hovered_key, pressed_key)
+        draw_keyboard(frame, keys, hovered_key, pressed_key, shift_on, caps_on)
+        draw_text_display(frame, typed_text, keys)
+
+        hy = frame.shape[0] - 10
+        if caps_on:
+            cv.putText(frame,'CAPS',(10,hy),cv.FONT_HERSHEY_SIMPLEX,0.55,(0,200,255),2)
+        if shift_on:
+            cv.putText(frame,'SHIFT',(80 if caps_on else 10, hy),
+                       cv.FONT_HERSHEY_SIMPLEX,0.55,(255,160,0),2)
 
         cv.imshow("Virtual Keyboard", frame)
-        if cv.waitKey(1) & 0xFF == ord("q"):
+        if cv.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
     cv.destroyAllWindows()
-    
- 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()
