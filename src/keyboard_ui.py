@@ -110,6 +110,23 @@ def draw_keyboard(
     cv2.addWeighted(overlay, KEY_ALPHA, frame, 1 - KEY_ALPHA, 0, frame)
 
 
+def draw_dwell_progress(frame, key, progress):
+    if not key:
+        return
+
+    progress = max(0.0, min(1.0, progress))
+    x, y, w, h = key["x"], key["y"], key["w"], key["h"]
+    bar_h = max(6, h // 8)
+    y1 = y + h - bar_h - 3
+    x1 = x + 3
+    x2 = x + w - 3
+    fill_x2 = x1 + int((x2 - x1) * progress)
+
+    cv2.rectangle(frame, (x1, y1), (x2, y + h - 3), (255, 255, 255), 1)
+    if fill_x2 > x1:
+        cv2.rectangle(frame, (x1, y1), (fill_x2, y + h - 3), (0, 220, 255), cv2.FILLED)
+
+
 def draw_text_display(frame, text, keys):
     x1 = min(k["x"] for k in keys)
     x2 = max(k["x"] + k["w"] for k in keys)

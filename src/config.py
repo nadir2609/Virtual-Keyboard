@@ -95,3 +95,8 @@ TEXT_BOX_COLOR = (30, 30, 30)
 
 CLICK_THRESHOLD = 35
 DEBOUNCE_DELAY = 0.3
+
+# Click input mode: "pinch", "dwell", or "pinch_or_dwell"
+INPUT_MODE = "dwell"
+DWELL_TIME_MS = 650
+DWELL_MOVE_TOLERANCE = 18
