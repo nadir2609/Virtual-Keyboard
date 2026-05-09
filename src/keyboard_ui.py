@@ -1,4 +1,6 @@
 # keyboard_ui.py
+import os
+
 import cv2
 from config import (
     KEYBOARD_ROWS,
@@ -19,8 +21,12 @@ from config import (
     TEXT_BOX_COLOR,
 )
 
-_SPECIAL = {"BACK", "TAB", "CAPS", "ENTER", "SHIFT", "SPACE", "\\", "CLEAR"}
-_SMALL = {"BACK", "TAB", "CAPS", "ENTER", "SHIFT", "SPACE", "CLEAR"}
+_SPECIAL = {"BACK", "TAB", "CAPS", "SHIFT", "SPACE", "\\", "CLEAR", "GOOGLE"}
+_SMALL = {"BACK", "TAB", "CAPS", "SHIFT", "SPACE", "CLEAR"}
+_GOOGLE_LOGO_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "images", "google2.png"
+)
+_GOOGLE_LOGO = cv2.imread(_GOOGLE_LOGO_PATH, cv2.IMREAD_UNCHANGED)
 
 
 def _row_px(row):
@@ -85,6 +91,9 @@ def _draw_key(overlay, key, color):
     label = key["char"]
     cv2.rectangle(overlay, (x, y), (x + w, y + h), color, cv2.FILLED)
     cv2.rectangle(overlay, (x, y), (x + w, y + h), COLOR_BORDER, 1)
+    if label == "GOOGLE" and _GOOGLE_LOGO is not None:
+        _draw_google_logo(overlay, key)
+        return
     font = cv2.FONT_HERSHEY_SIMPLEX
     fs = 0.60 if label in _SMALL else 0.90
     thick = 2 if label in _SMALL else 2
@@ -99,6 +108,32 @@ def _draw_key(overlay, key, color):
         thick,
         cv2.LINE_AA,
     )
+
+
+def _draw_google_logo(overlay, key):
+    pad = 6
+    x1 = key["x"] + pad
+    y1 = key["y"] + pad
+    x2 = min(key["x"] + key["w"] - pad, overlay.shape[1])
+    y2 = min(key["y"] + key["h"] - pad, overlay.shape[0])
+    if x2 <= x1 or y2 <= y1:
+        return
+
+    target_w = x2 - x1
+    target_h = y2 - y1
+    logo = cv2.resize(_GOOGLE_LOGO, (target_w, target_h), interpolation=cv2.INTER_AREA)
+
+    if len(logo.shape) == 2:
+        logo = cv2.cvtColor(logo, cv2.COLOR_GRAY2BGR)
+
+    roi = overlay[y1:y2, x1:x2]
+    if logo.shape[2] == 4:
+        logo_bgr = logo[:, :, :3]
+        alpha = logo[:, :, 3:4].astype("float32") / 255.0
+        blended = alpha * logo_bgr + (1.0 - alpha) * roi
+        roi[:, :] = blended.astype("uint8")
+    else:
+        roi[:, :] = logo[:, :, :3]
 
 
 def draw_keyboard(
